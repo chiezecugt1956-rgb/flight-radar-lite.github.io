@@ -1,5 +1,5 @@
 // ========== CONFIG ==========
-const OPENSKY_URL = "https://opensky-network.org/api/states/all";
+const API_URL = "https://workers-playground-proud-bush-1848.terrytaiwo96.workers.dev/";
 
 // Approximate bounding box for Nigeria (WGS84)
 const BBOX = {
