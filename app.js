@@ -1,28 +1,26 @@
-
 // ========== CONFIG ==========
-const OPENSKY_URL = "https://opensky-network.org/api/states/all";
+const API_URL = "https://workers-playground-proud-bush-1848.terrytaiwo96.workers.dev/";
 
-// Approximate bounding box for Nigeria (WGS84)
-const BBOX = {
-  lamin: 4.0,   // south
-  lomin: 2.5,   // west
-  lamax: 14.0,  // north
-  lomax: 15.0   // east
-};
-
-const POLL_INTERVAL_MS = 15000; // 15 seconds (respect rate limits)
+const POLL_INTERVAL_MS = 15000; // 15 seconds
 const STALE_THRESHOLD_S = 60;   // consider data stale after 60s
+
+// Nigeria map bounds (for map view only)
+const BBOX = {
+  lamin: 4.0,
+  lomin: 2.5,
+  lamax: 14.0,
+  lomax: 15.0
+};
 
 // ========== STATE ==========
 let map;
 let markersLayer;
-let aircraftMap = new Map(); // icao24 → marker
+let aircraftMap = new Map(); // hex → marker
 let lastSuccessfulFetch = 0;
 let pollTimer = null;
 
 // ========== INIT ==========
 function init() {
-  // Center roughly on Nigeria
   map = L.map("map", {
     minZoom: 5,
     maxZoom: 12
@@ -32,7 +30,6 @@ function init() {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
 
-  // Keep the view roughly over Nigeria
   const bounds = L.latLngBounds(
     [BBOX.lamin, BBOX.lomin],
     [BBOX.lamax, BBOX.lomax]
@@ -42,11 +39,8 @@ function init() {
 
   markersLayer = L.layerGroup().addTo(map);
 
-  // Start polling
   fetchFlights();
   pollTimer = setInterval(fetchFlights, POLL_INTERVAL_MS);
-
-  // Staleness check every 5 s
   setInterval(checkStaleness, 5000);
 }
 
@@ -54,77 +48,60 @@ function init() {
 async function fetchFlights() {
   setStatus("Fetching…", "warn");
 
-  const params = new URLSearchParams({
-    lamin: BBOX.lamin,
-    lomin: BBOX.lomin,
-    lamax: BBOX.lamax,
-    lomax: BBOX.lomax
-  });
-
   try {
-    const res = await fetch(`${OPENSKY_URL}?${params}`);
+    const res = await fetch(API_URL);
+
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
 
     const data = await res.json();
     lastSuccessfulFetch = Date.now();
-    processStates(data);
+    processAircraft(data);
     setStatus("Live", "ok");
   } catch (err) {
     console.error(err);
     setStatus("Error – retrying", "error");
-    // Keep old markers so the map doesn’t go empty
   }
 }
 
-function processStates(data) {
-  const states = data.states || [];
-  const now = Math.floor(Date.now() / 1000);
+function processAircraft(data) {
+  // ADSB.fi / ADS-B Exchange style response
+  const aircraftList = data.ac || data.aircraft || [];
   const seen = new Set();
 
-  states.forEach(state => {
-    // state vector indices (see OpenSky docs)
-    const [
-      icao24,
-      callsign,
-      originCountry,
-      timePosition,
-      lastContact,
-      longitude,
-      latitude,
-      baroAltitude,
-      onGround,
-      velocity,
-      trueTrack,
-      verticalRate
-    ] = state;
+  aircraftList.forEach(ac => {
+    // Skip if no position
+    if (ac.lat == null || ac.lon == null) return;
 
-    if (latitude == null || longitude == null) return;
-    if (onGround) return; // only show airborne aircraft
+    // Skip grounded aircraft (optional)
+    if (ac.alt_baro === "ground" || ac.alt_baro === 0) return;
 
-    seen.add(icao24);
+    const hex = (ac.hex || "").toLowerCase();
+    if (!hex) return;
+
+    seen.add(hex);
 
     const flight = {
-      icao24,
-      callsign: (callsign || "N/A").trim(),
-      originCountry: originCountry || "Unknown",
-      altitude: baroAltitude,          // meters
-      velocity: velocity,              // m/s
-      trueTrack: trueTrack,            // degrees
-      lastContact,
-      lat: latitude,
-      lon: longitude
+      icao24: hex,
+      callsign: (ac.flight || ac.r || "N/A").trim(),
+      registration: ac.r || null,
+      originCountry: "—",               // ADSB.fi doesn't always give country
+      altitude: typeof ac.alt_baro === "number" ? ac.alt_baro : null, // usually feet
+      velocity: typeof ac.gs === "number" ? ac.gs : null,             // knots
+      trueTrack: typeof ac.track === "number" ? ac.track : null,
+      lat: ac.lat,
+      lon: ac.lon
     };
 
     updateMarker(flight);
   });
 
-  // Remove markers that are no longer in the response
-  for (const [icao, marker] of aircraftMap) {
-    if (!seen.has(icao)) {
+  // Remove aircraft that disappeared
+  for (const [hex, marker] of aircraftMap) {
+    if (!seen.has(hex)) {
       markersLayer.removeLayer(marker);
-      aircraftMap.delete(icao);
+      aircraftMap.delete(hex);
     }
   }
 
@@ -135,7 +112,6 @@ function processStates(data) {
 
 // ========== MARKERS ==========
 function createPlaneIcon(heading) {
-  // Simple rotated plane SVG
   const rotation = heading != null ? heading : 0;
   return L.divIcon({
     className: "plane-icon",
@@ -172,11 +148,12 @@ function updateMarker(flight) {
 
 // ========== SIDEBAR ==========
 function showDetails(flight) {
-  const altM = flight.altitude != null ? Math.round(flight.altitude) : "—";
-  const altFt = flight.altitude != null ? Math.round(flight.altitude * 3.28084) : "—";
-  const speedMs = flight.velocity != null ? flight.velocity.toFixed(1) : "—";
-  const speedKmh = flight.velocity != null ? Math.round(flight.velocity * 3.6) : "—";
-  const speedKt = flight.velocity != null ? Math.round(flight.velocity * 1.94384) : "—";
+  // ADSB.fi usually returns altitude in feet and speed in knots
+  const altFt = flight.altitude != null ? Math.round(flight.altitude) : "—";
+  const altM  = flight.altitude != null ? Math.round(flight.altitude / 3.28084) : "—";
+
+  const speedKt  = flight.velocity != null ? Math.round(flight.velocity) : "—";
+  const speedKmh = flight.velocity != null ? Math.round(flight.velocity * 1.852) : "—";
 
   document.getElementById("details").innerHTML = `
     <div class="detail-row">
@@ -188,12 +165,12 @@ function showDetails(flight) {
       <span class="detail-value">${flight.icao24.toUpperCase()}</span>
     </div>
     <div class="detail-row">
-      <span class="detail-label">Country</span>
-      <span class="detail-value">${flight.originCountry}</span>
+      <span class="detail-label">Registration</span>
+      <span class="detail-value">${flight.registration || "—"}</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Altitude</span>
-      <span class="detail-value">${altM} m / ${altFt} ft</span>
+      <span class="detail-value">${altFt} ft / ${altM} m</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Speed</span>
