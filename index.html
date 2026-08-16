@@ -1,1 +1,35 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flight Radar Lite – Nigeria</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Flight Radar Lite</h1>
+    <p>Live flights over Nigeria • OpenSky Network</p>
+    <div id="status">Loading…</div>
+  </header>
+
+  <main>
+    <div id="map"></div>
+    <aside id="sidebar">
+      <h2>Flight Details</h2>
+      <div id="details">
+        <p class="placeholder">Click any aircraft on the map</p>
+      </div>
+      <div id="meta">
+        <p>Last update: <span id="last-update">—</span></p>
+        <p>Aircraft visible: <span id="count">0</span></p>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
