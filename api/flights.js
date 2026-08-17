@@ -1,17 +1,16 @@
 export default async function handler(req, res) {
-  // Set CORS headers to allow requests from GitHub Pages
+  // Allow requests from GitHub Pages or any frontend origin
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Allows all origins
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // Handle browser OPTIONS preflight request
+  // Handle browser CORS preflight requests
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   const { lamin, lomin, lamax, lomax } = req.query;
