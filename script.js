@@ -1,10 +1,7 @@
-// Nigeria airspace bounds for OpenSky API
 const NIGERIA_BOUNDS = { lamin: 4.0, lomin: 2.0, lamax: 14.0, lomax: 15.0 };
-
-// Fixed: Absolute URL pointing to your Vercel backend deployment
 const VERCEL_BACKEND_URL = "https://openskyeee.vercel.app";
 
-const map = L.map('map').setView([9.0820, 8.6753], 6); // Center of Nigeria
+const map = L.map('map').setView([9.0820, 8.6753], 6);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap'
@@ -17,7 +14,6 @@ async function fetchFlights() {
   try {
     document.getElementById('status').innerText = 'Updating...';
     
-    // Fixed: Using absolute Vercel backend URL to fix GitHub Pages 404 error
     const url = `${VERCEL_BACKEND_URL}/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
     
     const res = await fetch(url);
@@ -29,8 +25,6 @@ async function fetchFlights() {
     const currentIds = new Set();
 
     planes.forEach(p => {
-      // Corrected OpenSky State Vector indices:
-      // [0] icao24, [1] callsign, [2] origin_country, [5] longitude, [6] latitude, [7] baro_altitude, [9] velocity
       const icao = p[0];
       const callsign = p[1];
       const country = p[2];
@@ -47,7 +41,7 @@ async function fetchFlights() {
 
       const name = callsign ? callsign.trim() : 'Unknown';
       const altitude = alt ? Math.round(alt) : null;
-      const speed = velocity ? Math.round(velocity * 3.6) : null; // m/s to km/h
+      const speed = velocity ? Math.round(velocity * 3.6) : null;
       const countryName = country || 'N/A';
 
       if (markers[id]) {
@@ -62,7 +56,6 @@ async function fetchFlights() {
       }
     });
 
-    // Remove markers for planes no longer broadcasting
     Object.keys(markers).forEach(id => {
       if (!currentIds.has(id)) {
         map.removeLayer(markers[id]);
@@ -70,20 +63,17 @@ async function fetchFlights() {
       }
     });
 
-    const cacheStatus = res.headers.get('X-Cache') || '';
-    
-    // Update status bar with empty-state feedback when planeCount is 0
     if (planeCount === 0) {
       document.getElementById('status').innerText =
         `Last updated: ${new Date().toLocaleTimeString()} | Planes: 0 (No active ADS-B receivers online in Nigeria) | Refresh: 30s`;
     } else {
       document.getElementById('status').innerText =
-        `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s ${cacheStatus}`;
+        `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s`;
     }
 
   } catch (e) {
     console.error('Fetch Error:', e);
-    document.getElementById('status').innerText = 'Error fetching data. Retrying in 30s...';
+    document.getElementById('status').innerText = 'Error fetching data. Check backend CORS config.';
   }
 }
 
@@ -101,6 +91,5 @@ function showDetails(callsign, alt, speed, country) {
   `;
 }
 
-// Initial call and periodic refresh loop
 fetchFlights();
 setInterval(fetchFlights, 30000);
