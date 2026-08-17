@@ -1,59 +1,96 @@
 // Nigeria airspace bounds for OpenSky API
 const NIGERIA_BOUNDS = { lamin: 4.0, lomin: 2.0, lamax: 14.0, lomax: 15.0 };
+
+// Fixed: Absolute URL pointing to your Vercel backend deployment
+const VERCEL_BACKEND_URL = "https://openskyeee.vercel.app";
+
 const map = L.map('map').setView([9.0820, 8.6753], 6); // Center of Nigeria
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap'
 }).addTo(map);
+
 let markers = {};
 let planeCount = 0;
+
 async function fetchFlights() {
   try {
     document.getElementById('status').innerText = 'Updating...';
-    const url = `/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
+    
+    // Fixed: Using absolute Vercel backend URL to fix GitHub Pages 404 error
+    const url = `${VERCEL_BACKEND_URL}/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
+    
     const res = await fetch(url);
-    if (!res.ok) throw new Error('API Error');
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+
     const data = await res.json();
     const planes = data.states || [];
     planeCount = 0;
     const currentIds = new Set();
+
     planes.forEach(p => {
-      // Fixed: skip time_position (3) AND last_contact (4), and on_ground (8)
-      const [icao, callsign, country, , , lon, lat, alt, , velocity] = p;
+      // Corrected OpenSky State Vector indices:
+      // [0] icao24, [1] callsign, [2] origin_country, [5] longitude, [6] latitude, [7] baro_altitude, [9] velocity
+      const icao = p[0];
+      const callsign = p[1];
+      const country = p[2];
+      const lon = p[5];
+      const lat = p[6];
+      const alt = p[7];
+      const velocity = p[9];
+
       if (!lat || !lon) return;
+
       const id = String(icao);
       currentIds.add(id);
       planeCount++;
+
       const name = callsign ? callsign.trim() : 'Unknown';
       const altitude = alt ? Math.round(alt) : null;
-      const speed = velocity ? Math.round(velocity * 3.6) : null;
+      const speed = velocity ? Math.round(velocity * 3.6) : null; // m/s to km/h
       const countryName = country || 'N/A';
+
       if (markers[id]) {
         markers[id].setLatLng([lat, lon]);
       } else {
         const marker = L.marker([lat, lon], {
           icon: L.divIcon({ className: 'plane-icon', html: '✈️', iconSize: [20, 20] })
         }).addTo(map);
+
         marker.on('click', () => showDetails(name, altitude, speed, countryName));
         markers[id] = marker;
       }
     });
+
+    // Remove markers for planes no longer broadcasting
     Object.keys(markers).forEach(id => {
       if (!currentIds.has(id)) {
         map.removeLayer(markers[id]);
         delete markers[id];
       }
     });
+
     const cacheStatus = res.headers.get('X-Cache') || '';
-    document.getElementById('status').innerText =
-      `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s ${cacheStatus}`;
+    
+    // Update status bar with empty-state feedback when planeCount is 0
+    if (planeCount === 0) {
+      document.getElementById('status').innerText =
+        `Last updated: ${new Date().toLocaleTimeString()} | Planes: 0 (No active ADS-B receivers online in Nigeria) | Refresh: 30s`;
+    } else {
+      document.getElementById('status').innerText =
+        `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s ${cacheStatus}`;
+    }
+
   } catch (e) {
     console.error('Fetch Error:', e);
     document.getElementById('status').innerText = 'Error fetching data. Retrying in 30s...';
   }
 }
+
 function showDetails(callsign, alt, speed, country) {
   const altText = alt ? alt.toLocaleString() + ' meters' : '<span class="na">N/A</span>';
   const speedText = speed ? speed.toLocaleString() + ' km/h' : '<span class="na">N/A</span>';
+
   document.getElementById('details').innerHTML = `
     <div class="plane-card">
       <h3>${callsign}</h3>
@@ -63,5 +100,7 @@ function showDetails(callsign, alt, speed, country) {
     </div>
   `;
 }
+
+// Initial call and periodic refresh loop
 fetchFlights();
 setInterval(fetchFlights, 30000);
