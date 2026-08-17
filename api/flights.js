@@ -1,28 +1,32 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate');
+  // Set CORS headers to allow requests from GitHub Pages
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Allows all origins
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // Handle browser OPTIONS preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
   const { lamin, lomin, lamax, lomax } = req.query;
-  const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    
-    if (!response.ok) throw new Error(`OpenSky: ${response.status}`);
+    const openSkyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+    const response = await fetch(openSkyUrl);
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'OpenSky API request failed' });
+    }
+
     const data = await response.json();
-    
-    res.status(200).json(data || { time: 0, states: [] });
-    
+    return res.status(200).json(data);
   } catch (error) {
-    console.error("OpenSky error:", error.name);
-    // Return empty data instead of crashing
-    res.status(200).json({ time: 0, states: [], error: "OpenSky slow, trying again..." });
-    
-  } finally {
-    // This runs no matter what - try OR catch
-    clearTimeout(timeoutId); 
+    return res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }
