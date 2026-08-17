@@ -16,7 +16,7 @@ async function fetchFlights() {
     
     const url = `${VERCEL_BACKEND_URL}/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
     
-    const res = await fetch(url);
+    const res = await fetch(url); // Line 19
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
 
     const data = await res.json();
@@ -65,7 +65,7 @@ async function fetchFlights() {
 
     if (planeCount === 0) {
       document.getElementById('status').innerText =
-        `Last updated: ${new Date().toLocaleTimeString()} | Planes: 0 (No active ADS-B receivers online in Nigeria) | Refresh: 30s`;
+        `Last updated: ${new Date().toLocaleTimeString()} | Planes: 0 (No active receivers in area) | Refresh: 30s`;
     } else {
       document.getElementById('status').innerText =
         `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s`;
@@ -73,7 +73,7 @@ async function fetchFlights() {
 
   } catch (e) {
     console.error('Fetch Error:', e);
-    document.getElementById('status').innerText = 'Error fetching data. Check backend CORS config.';
+    document.getElementById('status').innerText = 'CORS or Network Error fetching data. Retrying...';
   }
 }
 
@@ -91,5 +91,6 @@ function showDetails(callsign, alt, speed, country) {
   `;
 }
 
+// Initial fetch & loop setup
 fetchFlights();
-setInterval(fetchFlights, 30000);
+setInterval(fetchFlights, 30000); // Line 94
