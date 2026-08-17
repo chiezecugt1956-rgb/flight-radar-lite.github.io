@@ -1,76 +1,67 @@
-// Replace with your actual Vercel backend domain
-const VERCEL_BACKEND_URL = "https://openskyeee.vercel.app";
-// Bounding box for Nigerian airspace
-const lamin = 4.0;
-const lomin = 2.0;
-const lamax = 14.0;
-const lomax = 15.0;
+// Nigeria airspace bounds for OpenSky API
+const NIGERIA_BOUNDS = { lamin: 4.0, lomin: 2.0, lamax: 14.0, lomax: 15.0 };
+const map = L.map('map').setView([9.0820, 8.6753], 6); // Center of Nigeria
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+let markers = {};
+let planeCount = 0;
 async function fetchFlights() {
-  // Use absolute URL pointing to your Vercel deployment instead of a relative path
-  const url = `${VERCEL_BACKEND_URL}/api/flights?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
   try {
-    const response = await fetch(url);
-   
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-   
-    // OpenSky returns { states: [...] } or null if no flights are in the bounding box
-    const flights = data.states || [];
-    if (flights.length === 0) {
-      console.log("No live aircraft detected in Nigerian airspace at this moment.");
-      showEmptyStateNotice();
-    } else {
-      clearEmptyStateNotice();
-      renderFlightsOnMap(flights);
-    }
-  } catch (error) {
-    console.error("Fetch Error:", error);
-    showErrorNotice("Unable to load flight data. Check backend status.");
+    document.getElementById('status').innerText = 'Updating...';
+    const url = `/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API Error');
+    const data = await res.json();
+    const planes = data.states || [];
+    planeCount = 0;
+    const currentIds = new Set();
+    planes.forEach(p => {
+      // Fixed: skip time_position (3) AND last_contact (4), and on_ground (8)
+      const [icao, callsign, country, , , lon, lat, alt, , velocity] = p;
+      if (!lat || !lon) return;
+      const id = String(icao);
+      currentIds.add(id);
+      planeCount++;
+      const name = callsign ? callsign.trim() : 'Unknown';
+      const altitude = alt ? Math.round(alt) : null;
+      const speed = velocity ? Math.round(velocity * 3.6) : null;
+      const countryName = country || 'N/A';
+      if (markers[id]) {
+        markers[id].setLatLng([lat, lon]);
+      } else {
+        const marker = L.marker([lat, lon], {
+          icon: L.divIcon({ className: 'plane-icon', html: '✈️', iconSize: [20, 20] })
+        }).addTo(map);
+        marker.on('click', () => showDetails(name, altitude, speed, countryName));
+        markers[id] = marker;
+      }
+    });
+    Object.keys(markers).forEach(id => {
+      if (!currentIds.has(id)) {
+        map.removeLayer(markers[id]);
+        delete markers[id];
+      }
+    });
+    const cacheStatus = res.headers.get('X-Cache') || '';
+    document.getElementById('status').innerText =
+      `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s ${cacheStatus}`;
+  } catch (e) {
+    console.error('Fetch Error:', e);
+    document.getElementById('status').innerText = 'Error fetching data. Retrying in 30s...';
   }
 }
-// Function to render markers on your map
-function renderFlightsOnMap(flights) {
-  // Clear existing markers first if your mapping library requires it
- 
-  flights.forEach(flight => {
-    const icao24 = flight[0];
-    const callsign = flight[1] ? flight[1].trim() : 'Unknown';
-    const country = flight[2];
-    const lon = flight[5];
-    const lat = flight[6];
-    const altitudeMeters = flight[7];
-    const velocityMps = flight[9];
-    const heading = flight[10];
-    // Skip flights missing location coordinates
-    if (lat === null || lon === null) return;
-    // Example Leaflet.js / Mapbox marker creation:
-    // L.marker([lat, lon]).addTo(map).bindPopup(`<b>${callsign}</b><br>ICAO: ${icao24}`);
-  });
+function showDetails(callsign, alt, speed, country) {
+  const altText = alt ? alt.toLocaleString() + ' meters' : '<span class="na">N/A</span>';
+  const speedText = speed ? speed.toLocaleString() + ' km/h' : '<span class="na">N/A</span>';
+  document.getElementById('details').innerHTML = `
+    <div class="plane-card">
+      <h3>${callsign}</h3>
+      <p><b>Country:</b> ${country}</p>
+      <p><b>Altitude:</b> ${altText}</p>
+      <p><b>Speed:</b> ${speedText}</p>
+    </div>
+  `;
 }
-// Visual helpers for empty states or errors
-function showEmptyStateNotice() {
-  const statusDiv = document.getElementById("status-message");
-  if (statusDiv) {
-    statusDiv.innerText = "No active aircraft broadcasting ADS-B data over Nigerian airspace right now.";
-    statusDiv.style.display = "block";
-  }
-}
-function clearEmptyStateNotice() {
-  const statusDiv = document.getElementById("status-message");
-  if (statusDiv) {
-    statusDiv.style.display = "none";
-  }
-}
-function showErrorNotice(msg) {
-  const statusDiv = document.getElementById("status-message");
-  if (statusDiv) {
-    statusDiv.innerText = msg;
-    statusDiv.style.display = "block";
-  }
-}
-// Initial fetch on page load
 fetchFlights();
-// Refresh flight positions every 30 seconds
 setInterval(fetchFlights, 30000);
