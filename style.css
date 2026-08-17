@@ -3,16 +3,14 @@
   margin: 0;
   padding: 0;
 }
-
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
   background: #0f172a;
   color: #e2e8f0;
 }
-
 header {
   padding: 0.75rem 1.25rem;
   background: #1e293b;
@@ -20,19 +18,9 @@ header {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  flex-wrap: wrap;
 }
-
-header h1 {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-header p {
-  font-size: 0.875rem;
-  color: #94a3b8;
-}
-
+header h1 { font-size: 1.25rem; }
+header p { font-size: 0.875rem; color: #94a3b8; }
 #status {
   margin-left: auto;
   font-size: 0.8rem;
@@ -40,22 +28,15 @@ header p {
   border-radius: 999px;
   background: #334155;
 }
-
 #status.ok { background: #166534; }
 #status.warn { background: #854d0e; }
 #status.error { background: #991b1b; }
-
 main {
   flex: 1;
   display: flex;
   min-height: 0;
 }
-
-#map {
-  flex: 1;
-  min-height: 400px;
-}
-
+#map { flex: 1; }
 #sidebar {
   width: 320px;
   background: #1e293b;
@@ -64,70 +45,23 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  overflow-y: auto;
 }
-
-#sidebar h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
 #details {
   background: #0f172a;
   border-radius: 8px;
   padding: 1rem;
   min-height: 140px;
 }
-
-#details .placeholder {
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
 .detail-row {
   display: flex;
   justify-content: space-between;
   padding: 0.4rem 0;
   border-bottom: 1px solid #1e293b;
-  font-size: 0.95rem;
 }
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  color: #94a3b8;
-}
-
-.detail-value {
-  font-weight: 500;
-  color: #f1f5f9;
-}
-
-#meta {
-  font-size: 0.8rem;
-  color: #94a3b8;
-  margin-top: auto;
-}
-
-#meta p {
-  margin-bottom: 0.35rem;
-}
-
-/* Plane icon */
-.plane-icon {
-  background: transparent;
-  border: none;
-}
-
-/* Responsive */
+.detail-label { color: #94a3b8; }
+.detail-value { font-weight: 500; color: #f1f5f9; }
+.plane-icon { background: transparent; border: none; }
 @media (max-width: 768px) {
-  main {
-    flex-direction: column;
-  }
-  #sidebar {
-    width: 100%;
-    max-height: 40vh;
-  }
+  main { flex-direction: column; }
+  #sidebar { width: 100%; max-height: 40vh; }
 }
