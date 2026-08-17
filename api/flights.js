@@ -1,45 +1,28 @@
-// Simple in-memory cache to save API credits
-let cache = {
-  data: null,
-  timestamp: 0
-};
-const CACHE_DURATION = 30000; // 30 seconds
-
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate');
+
+  const { lamin, lomin, lamax, lomax } = req.query;
+  const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
   try {
-    const now = Date.now();
+    const response = await fetch(url, { signal: controller.signal });
     
-    // If cache is fresh, return it instead of hitting OpenSky
-    if (cache.data && (now - cache.timestamp) < CACHE_DURATION) {
-      res.setHeader('X-Cache', 'HIT');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      return res.status(200).json(cache.data);
-    }
-
-    const { lamin, lomin, lamax, lomax } = req.query;
-    const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-
-    const response = await fetch(url);
-    if(!response.ok) throw new Error('OpenSky API error');
-    
+    if (!response.ok) throw new Error(`OpenSky: ${response.status}`);
     const data = await response.json();
-
-    // Save to cache
-    cache.data = data;
-    cache.timestamp = now;
-
-    res.setHeader('X-Cache', 'MISS');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate');
-    res.status(200).json(data);
-
+    
+    res.status(200).json(data || { time: 0, states: [] });
+    
   } catch (error) {
-    console.error(error);
-    // If API fails but we have old cache, return old cache
-    if(cache.data) {
-      res.setHeader('X-Cache', 'STALE');
-      return res.status(200).json(cache.data);
-    }
-    res.status(500).json({ error: 'Failed to fetch flights' });
+    console.error("OpenSky error:", error.name);
+    // Return empty data instead of crashing
+    res.status(200).json({ time: 0, states: [], error: "OpenSky slow, trying again..." });
+    
+  } finally {
+    // This runs no matter what - try OR catch
+    clearTimeout(timeoutId); 
   }
 }
