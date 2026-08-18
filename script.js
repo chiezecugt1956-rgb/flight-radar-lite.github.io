@@ -1,5 +1,4 @@
-// Replace with your actual Vercel backend URL
-const API_BASE = 'https://YOUR-BACKEND.vercel.app';
+const API_BASE = 'https://flight-radar-lite-github-io-imln.vercel.app';
 
 const map = L.map('map').setView([20, 0], 2); // Zoomed out to show the whole world
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -12,7 +11,6 @@ let planeCount = 0;
 async function fetchFlights() {
   try {
     document.getElementById('status').innerText = 'Updating...';
-    // No lamin/lomin/lamax/lomax = OpenSky returns ALL global aircraft
     const url = `${API_BASE}/api/flights`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('API Error');
