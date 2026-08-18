@@ -1,21 +1,27 @@
-// api/flights.js
+const express = require("express");
+const cors = require("cors");
+const fetch = require("node-fetch");
+
+const app = express();
+app.use(cors());
 
 let cache = {
   data: null,
   timestamp: 0,
   token: null,
-  tokenExpiry: 0
+  tokenExpiry: 0,
 };
 
-const CACHE_DURATION = 30_000;
+const CACHE_DURATION = 30_000; // 30 seconds
 
 const JP_BBOX = {
   lamin: 31.03,
   lomin: 129.41,
   lamax: 45.55,
-  lomax: 145.54
+  lomax: 145.54,
 };
 
+// Your OpenSky credentials
 const CLIENT_ID = "oloniyot123-api-client";
 const CLIENT_SECRET = "7YFCBgFf8cpqsvH6IE5OF5MUgSbeKvd1";
 
@@ -52,23 +58,18 @@ async function getAccessToken() {
   return cache.token;
 }
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
-
+app.get("/api/flights", async (req, res) => {
   try {
     const now = Date.now();
 
-    // Return cache if available
+    // Return cache if still fresh
     if (cache.data && now - cache.timestamp < CACHE_DURATION) {
       res.setHeader("X-Cache", "HIT");
-      return res.status(200).json(cache.data);
+      return res.json(cache.data);
     }
 
-    // 1. Get token
     const token = await getAccessToken();
 
-    // 2. Call OpenSky
     const url = new URL("https://opensky-network.org/api/states/all");
     url.searchParams.set("lamin", JP_BBOX.lamin);
     url.searchParams.set("lomin", JP_BBOX.lomin);
@@ -94,16 +95,30 @@ export default async function handler(req, res) {
     cache.timestamp = now;
 
     res.setHeader("X-Cache", "MISS");
-    return res.status(200).json(data);
-
+    res.json(data);
   } catch (error) {
-    console.error("API Error:", error.message);
+    console.error("Error:", error.message);
 
-    // Return real error
-    return res.status(200).json({
+    // Return stale cache if available
+    if (cache.data) {
+      res.setHeader("X-Cache", "STALE");
+      return res.json(cache.data);
+    }
+
+    res.status(200).json({
       time: 0,
       states: [],
-      error: error.message || "Unknown error",
+      error: error.message,
     });
   }
-}
+});
+
+// Health check
+app.get("/", (req, res) => {
+  res.send("Japan Flights API is running");
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
