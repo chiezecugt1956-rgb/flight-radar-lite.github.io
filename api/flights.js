@@ -40,15 +40,14 @@ async function getAccessToken() {
     }
   );
 
-  const text = await res.text();
-
   if (!res.ok) {
-    throw new Error(`Token failed (${res.status}): ${text}`);
+    const text = await res.text();
+    throw new Error(`Token error ${res.status}: ${text}`);
   }
 
-  const data = JSON.parse(text);
+  const data = await res.json();
   cache.token = data.access_token;
-  cache.tokenExpiry = Date.now() + (data.expires_in * 1000);
+  cache.tokenExpiry = Date.now() + data.expires_in * 1000;
 
   return cache.token;
 }
@@ -60,42 +59,37 @@ export default async function handler(req, res) {
   try {
     const now = Date.now();
 
-    if (cache.data && (now - cache.timestamp) < CACHE_DURATION) {
+    // Return cache if available
+    if (cache.data && now - cache.timestamp < CACHE_DURATION) {
       res.setHeader("X-Cache", "HIT");
       return res.status(200).json(cache.data);
     }
 
+    // 1. Get token
     const token = await getAccessToken();
 
+    // 2. Call OpenSky
     const url = new URL("https://opensky-network.org/api/states/all");
     url.searchParams.set("lamin", JP_BBOX.lamin);
     url.searchParams.set("lomin", JP_BBOX.lomin);
     url.searchParams.set("lamax", JP_BBOX.lamax);
     url.searchParams.set("lomax", JP_BBOX.lomax);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
-
-    let response;
-    try {
-      response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    const responseText = await response.text();
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
 
     if (!response.ok) {
-      throw new Error(`OpenSky failed (${response.status}): ${responseText}`);
+      const text = await response.text();
+      throw new Error(`OpenSky ${response.status}: ${text}`);
     }
 
-    const data = JSON.parse(responseText);
+    const data = await response.json();
 
+    // Save to cache
     cache.data = data;
     cache.timestamp = now;
 
@@ -103,13 +97,13 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("API Error:", error.message);
 
-    // Return the REAL error so we can see it
+    // Return real error
     return res.status(200).json({
       time: 0,
       states: [],
-      error: error.message
+      error: error.message || "Unknown error",
     });
   }
 }
