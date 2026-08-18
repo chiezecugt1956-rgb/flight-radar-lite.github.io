@@ -1,23 +1,27 @@
-// Nigeria airspace bounds for OpenSky API
-const NIGERIA_BOUNDS = { lamin: 4.0, lomin: 2.0, lamax: 14.0, lomax: 15.0 };
-const map = L.map('map').setView([9.0820, 8.6753], 6); // Center of Nigeria
+// Replace with your actual Vercel backend URL
+const API_BASE = 'https://YOUR-BACKEND.vercel.app';
+
+const map = L.map('map').setView([20, 0], 2); // Zoomed out to show the whole world
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap'
 }).addTo(map);
+
 let markers = {};
 let planeCount = 0;
+
 async function fetchFlights() {
   try {
     document.getElementById('status').innerText = 'Updating...';
-    const url = `/api/flights?lamin=${NIGERIA_BOUNDS.lamin}&lomin=${NIGERIA_BOUNDS.lomin}&lamax=${NIGERIA_BOUNDS.lamax}&lomax=${NIGERIA_BOUNDS.lomax}`;
+    // No lamin/lomin/lamax/lomax = OpenSky returns ALL global aircraft
+    const url = `${API_BASE}/api/flights`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('API Error');
     const data = await res.json();
     const planes = data.states || [];
     planeCount = 0;
     const currentIds = new Set();
+
     planes.forEach(p => {
-      // Fixed: skip time_position (3) AND last_contact (4), and on_ground (8)
       const [icao, callsign, country, , , lon, lat, alt, , velocity] = p;
       if (!lat || !lon) return;
       const id = String(icao);
@@ -27,6 +31,7 @@ async function fetchFlights() {
       const altitude = alt ? Math.round(alt) : null;
       const speed = velocity ? Math.round(velocity * 3.6) : null;
       const countryName = country || 'N/A';
+
       if (markers[id]) {
         markers[id].setLatLng([lat, lon]);
       } else {
@@ -37,12 +42,14 @@ async function fetchFlights() {
         markers[id] = marker;
       }
     });
+
     Object.keys(markers).forEach(id => {
       if (!currentIds.has(id)) {
         map.removeLayer(markers[id]);
         delete markers[id];
       }
     });
+
     const cacheStatus = res.headers.get('X-Cache') || '';
     document.getElementById('status').innerText =
       `Last updated: ${new Date().toLocaleTimeString()} | Planes: ${planeCount} | Refresh: 30s ${cacheStatus}`;
@@ -51,6 +58,7 @@ async function fetchFlights() {
     document.getElementById('status').innerText = 'Error fetching data. Retrying in 30s...';
   }
 }
+
 function showDetails(callsign, alt, speed, country) {
   const altText = alt ? alt.toLocaleString() + ' meters' : '<span class="na">N/A</span>';
   const speedText = speed ? speed.toLocaleString() + ' km/h' : '<span class="na">N/A</span>';
@@ -63,5 +71,6 @@ function showDetails(callsign, alt, speed, country) {
     </div>
   `;
 }
+
 fetchFlights();
 setInterval(fetchFlights, 30000);
