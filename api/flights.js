@@ -3,15 +3,14 @@ let cache = {
   data: null,
   timestamp: 0
 };
-
 const CACHE_DURATION = 30_000; // 30 seconds
 
-// Contiguous United States (lower 48) bounding box
-const US_BBOX = {
-  lamin: 24.4,   // south
-  lomin: -125.0, // west
-  lamax: 49.4,   // north
-  lomax: -66.9   // east
+// Japan bounding box (~234 sq° → 3 credits)
+const JP_BBOX = {
+  lamin: 31.03,  // south
+  lomin: 129.41, // west
+  lamax: 45.55,  // north
+  lomax: 145.54  // east
 };
 
 export default async function handler(req, res) {
@@ -28,10 +27,10 @@ export default async function handler(req, res) {
     }
 
     const url = new URL('https://opensky-network.org/api/states/all');
-    url.searchParams.set('lamin', US_BBOX.lamin);
-    url.searchParams.set('lomin', US_BBOX.lomin);
-    url.searchParams.set('lamax', US_BBOX.lamax);
-    url.searchParams.set('lomax', US_BBOX.lomax);
+    url.searchParams.set('lamin', JP_BBOX.lamin);
+    url.searchParams.set('lomin', JP_BBOX.lomin);
+    url.searchParams.set('lamax', JP_BBOX.lamax);
+    url.searchParams.set('lomax', JP_BBOX.lomax);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000); // safely under Vercel's 10s limit
