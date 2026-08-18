@@ -83,7 +83,6 @@ h2 {
   color: #eee;
 }
 
-/* Dims "N/A" values — requires .na span wrapper from script.js, since CSS can't select by text content */
 .plane-card p .na {
   color: #555;
 }
@@ -103,22 +102,21 @@ h2 {
 }
 
 .plane-icon {
-  font-size: 20px;
-  transform: rotate(90deg);
-  transform-origin: center;
+  font-size: 18px;
   filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.6));
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.15s ease;
 }
 
 .plane-icon:hover {
-  transform: rotate(90deg) scale(1.2);
+  transform: scale(1.25);
 }
 
 .leaflet-control-attribution {
   background: rgba(10, 10, 10, 0.7) !important;
   color: #888 !important;
 }
+
 .leaflet-control-attribution a {
   color: #00d4ff !important;
 }
