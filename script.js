@@ -1,4 +1,4 @@
-const API_BASE = 'https://flight-radar-lite-github-io-imln.vercel.app';
+const API_BASE = "https://your-railway-url.up.railway.app";
 
 // Center on Japan
 const map = L.map('map').setView([36.5, 138.0], 5);
