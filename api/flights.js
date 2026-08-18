@@ -1,4 +1,4 @@
-// api/flights.js  (or whatever your API route is named)
+// api/flights.js
 
 let cache = {
   data: null,
@@ -7,9 +7,8 @@ let cache = {
   tokenExpiry: 0
 };
 
-const CACHE_DURATION = 30_000; // 30 seconds
+const CACHE_DURATION = 30_000;
 
-// Japan bounding box
 const JP_BBOX = {
   lamin: 31.03,
   lomin: 129.41,
@@ -17,12 +16,10 @@ const JP_BBOX = {
   lomax: 145.54
 };
 
-// Your OpenSky credentials
 const CLIENT_ID = "oloniyot123-api-client";
 const CLIENT_SECRET = "7YFCBgFf8cpqsvH6IE5OF5MUgSbeKvd1";
 
 async function getAccessToken() {
-  // Reuse token if still valid (with 60s buffer)
   if (cache.token && Date.now() < cache.tokenExpiry - 60000) {
     return cache.token;
   }
@@ -43,11 +40,13 @@ async function getAccessToken() {
     }
   );
 
+  const text = await res.text();
+
   if (!res.ok) {
-    throw new Error(`Token error: ${res.status}`);
+    throw new Error(`Token failed (${res.status}): ${text}`);
   }
 
-  const data = await res.json();
+  const data = JSON.parse(text);
   cache.token = data.access_token;
   cache.tokenExpiry = Date.now() + (data.expires_in * 1000);
 
@@ -61,16 +60,13 @@ export default async function handler(req, res) {
   try {
     const now = Date.now();
 
-    // Serve from cache if fresh
     if (cache.data && (now - cache.timestamp) < CACHE_DURATION) {
       res.setHeader("X-Cache", "HIT");
       return res.status(200).json(cache.data);
     }
 
-    // Get token
     const token = await getAccessToken();
 
-    // Build OpenSky URL
     const url = new URL("https://opensky-network.org/api/states/all");
     url.searchParams.set("lamin", JP_BBOX.lamin);
     url.searchParams.set("lomin", JP_BBOX.lomin);
@@ -92,13 +88,14 @@ export default async function handler(req, res) {
       clearTimeout(timeoutId);
     }
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      throw new Error(`OpenSky: ${response.status}`);
+      throw new Error(`OpenSky failed (${response.status}): ${responseText}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
 
-    // Update cache
     cache.data = data;
     cache.timestamp = now;
 
@@ -106,18 +103,13 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error("OpenSky error:", error.name, error.message);
+    console.error("Error:", error.message);
 
-    // Return stale cache if available
-    if (cache.data) {
-      res.setHeader("X-Cache", "STALE");
-      return res.status(200).json(cache.data);
-    }
-
+    // Return the REAL error so we can see it
     return res.status(200).json({
       time: 0,
       states: [],
-      error: "OpenSky temporarily unavailable",
+      error: error.message
     });
   }
 }
